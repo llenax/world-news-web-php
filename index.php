@@ -3,19 +3,7 @@ session_start();
 
 include('lib/helper.php');
 
-$routes = [
-  "pages" => [
-    '/' => 'pages/index.php',
-    '/login' => 'pages/login.php',
-    '/logout' => 'pages/logout.php',
-  ],
-  "requests" => [
-    "GET" => [
-    ],
-    "POST" => [
-    ],
-  ]
-];
+include("routes.php");
 
 $current_url = explode("?", $_SERVER['REQUEST_URI'])[0];
 
@@ -55,7 +43,6 @@ if(array_key_exists($current_url, $routes["requests"][$_SERVER['REQUEST_METHOD']
       <?php else: ?>
         <?php include($routes["pages"]['/404']); ?>
       <?php endif; ?>
-      <script src="static/js/jquery.session.js" ></script>
     </body>
   </html>
 <?php endif; ?>
