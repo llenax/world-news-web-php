@@ -21,6 +21,7 @@ switch($_SERVER['REQUEST_METHOD']) {
           $rss_array = $_SESSION["user_rss"];
           array_push($rss_array, $json->new_rss);
           $_SESSION["user_rss"] = $rss_array;
+          $users_data = $_SESSION["users_data"];
           $show_view = true;
         }
       }
@@ -41,6 +42,7 @@ switch($_SERVER['REQUEST_METHOD']) {
           $key = array_search($selected, $rss_array);
           if ($key !== false) unset($rss_array[$key]);
           $_SESSION["user_rss"] = $rss_array;
+          $users_data = $_SESSION["users_data"];
           $show_view = true;
         }
         if($json->error) {
@@ -49,6 +51,52 @@ switch($_SERVER['REQUEST_METHOD']) {
       }
     }
     if(array_key_exists("create_user", $_POST)) {
+      $id = get_user_id($_SESSION["auth"]);
+
+      if($id){
+        $json = create_post_request([
+            "username" => $_POST["user_name"],
+            "password" => $_POST["user_password"]
+          ], "/users");
+        if($json->id) {
+          $notification_msg = "Kullanıcı başarı ile oluşturuldu.";
+          $rss_array = $_SESSION["user_rss"];
+          $users_data = $_SESSION["users_data"];
+          array_push($users_data, $json);
+          $_SESSION["users_data"] = $users_data;
+          $show_view = true;
+        }
+        if($json->error) {
+          $error_msg = $json->error;
+        }
+      }
+    }
+    if(array_key_exists("delete_user", $_POST)) {
+      $id = get_user_id($_SESSION["auth"]);
+
+      if($id) {
+        $json = create_get_request("", "/users/".$id);
+          if($json->user && $_POST["user_name"] === $json->user->username) {
+              $error_msg = "kendi hesabını silemezsin.";
+          } else {
+            $json = create_post_request(["username" => $_POST["user_name"]], "/users/delete");
+            if($json->msg) {
+              $notification_msg = "kullanıcı silindi.";
+              $rss_array = $_SESSION["user_rss"];
+              $users_data = $_SESSION["users_data"];
+              $selected = current(array_filter($users_data, function($e) {
+                return $e->username === $_POST["user_name"];
+              }));
+              $key = array_search($selected, $users_data);
+              if($key !== false) unset($users_data[$key]);
+              $_SESSION["users_data"] = $users_data;
+              $show_view = true;
+          }
+          if($json->error) {
+            $error_msg = "kullanıcı silinemedi.";
+          }
+        }
+      }
     }
     break;
   case "GET":
@@ -58,6 +106,14 @@ switch($_SERVER['REQUEST_METHOD']) {
       $rss_array = $json->rss;
       $_SESSION["user_rss"] = $rss_array;
     }
+
+    $json = create_get_request("", "/users");
+    $users_data = $json->users;
+
+    if($users_data) {
+      $_SESSION["users_data"] = $users_data;
+    }
+
     $show_view = true;
     break;
 }
@@ -84,7 +140,7 @@ switch($_SERVER['REQUEST_METHOD']) {
       <div></div>
     </div>
     <?php foreach($rss_array as $rss): ?>
-        <div class="grid sm:flex justify-between items-center m-2 p-4 bg-slate-100 rounded">
+        <div class="grid sm:flex justify-between items-center m-2 p-4 bg-slate-100 hover:bg-slate-200/75 rounded">
             <div class="font-bold text-slate-600"><?=$rss->id?></div>
             <div class="font-bold text-slate-600 truncate text-ellipsis"><?=$rss->rss_url?></div>
             <form method="POST">
@@ -97,8 +153,8 @@ switch($_SERVER['REQUEST_METHOD']) {
   </div>
 <?php endif; ?>
 
-<details class="bg-slate-200 hover:bg-slate-300 cursor-pointer p-4 mx-auto my-2 container">
-  <summary class="list-none font-bold text-slate-600 text-xl">+ RSS URL ekle</summary>
+<details class="bg-slate-200 hover:bg-slate-300 cursor-pointer mx-auto my-2 container">
+  <summary class="list-none font-bold text-slate-600 p-4 text-xl">+ RSS URL ekle</summary>
   <div class="flex w-full p-2">
     <form method="POST" class="w-full">
       <div class="flex flex-col w-full bg-slate-100 p-4 rounded gap-4">
@@ -112,8 +168,8 @@ switch($_SERVER['REQUEST_METHOD']) {
 </details>
 
 
-<details class="bg-slate-200 hover:bg-slate-300 cursor-pointer p-4 mx-auto my-2 container">
-  <summary class="list-none font-bold text-slate-600 text-xl">- RSS URL sil</summary>
+<details class="bg-slate-200 hover:bg-slate-300 cursor-pointer mx-auto my-2 container">
+  <summary class="list-none font-bold text-slate-600 p-4 text-xl">- RSS URL sil</summary>
   <div class="flex w-full p-2">
     <form method="POST" class="w-full">
       <div class="flex flex-col w-full bg-slate-100 p-4 rounded gap-4">
@@ -126,15 +182,15 @@ switch($_SERVER['REQUEST_METHOD']) {
   </div>
 </details>
 
-<details class="bg-slate-200 hover:bg-slate-300 cursor-pointer p-4 mx-auto my-2 container">
-  <summary class="list-none font-bold text-slate-600 text-xl">+ Kullanıcı oluştur</summary>
+<details class="bg-slate-200 hover:bg-slate-300 cursor-pointer mx-auto my-2 container">
+  <summary class="list-none font-bold text-slate-600 p-4 text-xl">+ Kullanıcı oluştur</summary>
   <div class="flex w-full p-2">
     <form method="POST" class="w-full">
       <div class="flex flex-col w-full bg-slate-100 p-4 rounded gap-4">
         <div class="text-xl font-bold text-slate-700 px-2">Kullanıcı adı</div>
         <input class="text-xl bg-slate-200 p-4 rounded" name="user_name" type="text" placeholder="oluşturulacak kullanıcı adını giriniz." />
         <div class="text-xl font-bold text-slate-700 px-2">Şifre</div>
-        <input class="text-xl bg-slate-200 p-4 rounded" name="user_password" type="text" placeholder="oluşturulacak şifreyi giriniz." />
+        <input class="text-xl bg-slate-200 p-4 rounded" name="user_password" type="password" placeholder="oluşturulacak şifreyi giriniz." />
         <input name="create_user" type="hidden" />
         <button class="mx-auto mr-0 bg-green-200 hover:bg-green-300 text-slate-700 font-bold text-lg rounded py-2 px-8" type="submit">Ekle</button>
       </div>
@@ -142,5 +198,23 @@ switch($_SERVER['REQUEST_METHOD']) {
   </div>
 </details>
 
+
+<details class="bg-slate-200 hover:bg-slate-300 cursor-pointer mx-auto my-2 container">
+  <summary class="list-none font-bold text-slate-600 p-4 text-xl">- Kullanıcı sil</summary>
+  <div class="flex w-full p-2">
+    <form method="POST" class="w-full">
+      <div class="flex flex-col w-full bg-slate-100 p-4 rounded gap-4">
+        <div class="text-xl font-bold text-slate-700 px-2">Kullanıcı adı</div>
+        <select class="text-xl bg-slate-200 p-4 rounded" name="user_name">
+          <?php foreach($users_data as $user): ?>
+            <option value="<?=$user->username?>"><?=$user->username?></option>
+          <?php endforeach;?>
+        </select>
+        <input name="delete_user" type="hidden" />
+        <button class="mx-auto mr-0 bg-rose-200 hover:bg-rose-300 text-slate-700 font-bold text-lg rounded py-2 px-8" type="submit">Sil</button>
+      </div>
+    </form>
+  </div>
+</details>
 
 <?php endif; ?>
